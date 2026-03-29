@@ -1,0 +1,37 @@
+# Переменные окружения (токены, API ключи)
+.env
+
+# База данных с пользовательскими данными
+travel_wallet.db
+*.db
+
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Виртуальное окружение
+venv/
+env/
+.venv/
+
+# Логи
+*.log
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Тесты и покрытие
+.pytest_cache/
+.coverage
+htmlcov/
