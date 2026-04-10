@@ -2,18 +2,14 @@
 
 import re
 
-from api_client import convert_currency
 from database import (
-    add_expense,
-    create_trip,
     get_active_trip,
     get_expenses_history,
     get_user_trips,
     switch_active_trip,
     update_exchange_rate,
-    update_trip_balance,
 )
-from keyboards import back_button, expense_description_buttons, main_menu, trip_list_buttons
+from keyboards import back_button, main_menu, trip_list_buttons
 from utils.currency_utils import format_currency_display
 
 
@@ -116,7 +112,11 @@ def show_history(call, bot):
 
     history_text = "📋 История расходов:\n\n"
     for expense in expenses[:10]:
-        history_text += f"• {expense[2]:,.2f} {dest_curr_name} = {expense[3]:,.2f} {dep_curr_name} - {expense[4] or 'Без описания'}\n"
+        desc = expense[4] or "Без описания"
+        history_text += (
+            f"• {expense[2]:,.2f} {dest_curr_name} = "
+            f"{expense[3]:,.2f} {dep_curr_name} - {desc}\n"
+        )
 
     bot.reply_to(call.message, history_text)
 
@@ -196,7 +196,7 @@ def handle_exchange_rate_confirm(call, bot):
         user_data['final_rate'] = user_data['exchange_rate']
         bot.temp_data = getattr(bot, 'temp_data', {})
         bot.temp_data.pop(f"exchange_{call.from_user.id}", None)
-        
+
         from handlers.messages import process_initial_amount_prompt
         process_initial_amount_prompt(call.message, user_data, bot)
     else:
@@ -208,7 +208,7 @@ def handle_exchange_rate_manual(call, bot):
     user_data = getattr(bot, 'temp_data', {}).get(f"exchange_{call.from_user.id}")
     if user_data:
         bot.edit_message_text(
-            chat_id=call.message.chat.id, 
+            chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=call.message.text + "\n\n✏️ Введите ваш курс обмена:"
         )
@@ -245,7 +245,7 @@ def process_manual_exchange_rate(message, user_data, bot):
         user_data['final_rate'] = float(message.text.strip())
         bot.temp_data = getattr(bot, 'temp_data', {})
         bot.temp_data.pop(f"exchange_{message.from_user.id}", None)
-        
+
         from handlers.messages import process_initial_amount_prompt
         process_initial_amount_prompt(message, user_data, bot)
     except ValueError:

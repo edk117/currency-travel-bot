@@ -3,7 +3,7 @@
 from telebot import types
 
 from api_client import convert_currency
-from database import get_user_trips, get_active_trip, get_connection
+from database import get_user_trips, get_connection
 from handlers.callbacks import (
     show_balance,
     show_history,
@@ -20,7 +20,7 @@ def register_commands(bot_instance):
     """Регистрация обработчиков команд"""
     global bot
     bot = bot_instance
-    
+
     @bot_instance.message_handler(commands=['start'])
     def send_welcome(message):
         user_id = message.from_user.id
@@ -63,11 +63,18 @@ def register_commands(bot_instance):
         trips = get_user_trips(message.from_user.id)
 
         if not trips:
-            bot_instance.reply_to(message, "❌ У вас нет созданных путешествий.")
+            bot_instance.reply_to(
+                message,
+                "❌ У вас нет созданных путешествий.",
+            )
             return
 
         markup = switch_trip_buttons(trips)
-        bot_instance.reply_to(message, "Выберите путешествие для переключения:", reply_markup=markup)
+        bot_instance.reply_to(
+            message,
+            "Выберите путешествие для переключения:",
+            reply_markup=markup,
+        )
 
 
 def process_departure_country(message):
@@ -100,9 +107,11 @@ def process_destination_country(message, user_data):
     dest_result = get_currency_info(dest_input)
 
     if not dep_result:
+        dep_country = user_data['departure_country']
         bot.reply_to(
             message,
-            f"❌ Не удалось определить валюту для страны отправления '{user_data['departure_country']}'. Попробуйте снова.",
+            f"❌ Не удалось определить валюту для страны "
+            f"'{dep_country}'. Попробуйте снова.",
         )
         return
 
@@ -125,16 +134,25 @@ def process_destination_country(message, user_data):
 
     if 'error' in rate_data:
         from keyboards import back_button
-        bot.reply_to(message, f"❌ Ошибка при получении курса: {rate_data['error']['info']}", reply_markup=back_button())
+        error_info = rate_data['error']['info']
+        bot.reply_to(
+            message,
+            f"❌ Ошибка при получении курса: {error_info}",
+            reply_markup=back_button(),
+        )
         return
 
     rate = rate_data['result']
     user_data['exchange_rate'] = rate
 
-    # Отправляем информацию о валюте назначения и курсе
-    response_text = f"страна назначения: {user_data['destination_country'].title()}\n"
-    response_text += f"валюта: {user_data['destination_currency']} ({user_data['destination_currency_name']})\n"
-    response_text += f"текщий курс по данным API: 1 {user_data['departure_currency']} = {rate} {user_data['destination_currency']}"
+    dest_country = user_data['destination_country'].title()
+    dest_curr = user_data['destination_currency']
+    dest_curr_name = user_data['destination_currency_name']
+    dep_curr = user_data['departure_currency']
+
+    response_text = f"страна назначения: {dest_country}\n"
+    response_text += f"валюта: {dest_curr} ({dest_curr_name})\n"
+    response_text += f"текщий курс по данным API: 1 {dep_curr} = {rate} {dest_curr}"
 
     # Сохраняем данные для callback
     bot.temp_data = getattr(bot, 'temp_data', {})

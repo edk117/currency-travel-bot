@@ -77,27 +77,27 @@ def process_expense_description(message, user_expense_data, skip, bot):
     if message.from_user.id in bot.expense_cancelled:
         bot.expense_cancelled.discard(message.from_user.id)
         return
-    
+
     if skip:
         description = ""
     else:
         description = message.text.strip()
         if description.lower() in ['пропустить', 'skip', '']:
             description = ""
-    
+
     trip_id = user_expense_data['trip_id']
     amount_dest = user_expense_data['amount_dest']
     amount_dep = user_expense_data['amount_dep']
-    
+
     # Добавляем расход с описанием
     add_expense(trip_id, amount_dest, amount_dep, description)
-    
+
     # Обновляем баланс (вычитаем расход)
     update_trip_balance(trip_id, -amount_dest, -amount_dep)
-    
+
     # Создаём клавиатуру с кнопкой "Назад"
     markup = back_button()
-    
+
     desc_text = f"Описание: {description}" if description else "Описание: без описания"
     bot.reply_to(
         message,
@@ -115,9 +115,11 @@ def process_expense_description(message, user_expense_data, skip, bot):
 def process_initial_amount_prompt(message, user_data, bot):
     """Запрос начальной суммы"""
     markup = back_button()
+    dep_curr = user_data['departure_currency']
+    dep_curr_name = user_data['departure_currency_name']
     msg = bot.reply_to(
         message,
-        f"💰 Введите начальную сумму в валюте {user_data['departure_currency']} ({user_data['departure_currency_name']}):",
+        f"💰 Введите начальную сумму в валюте {dep_curr} ({dep_curr_name}):",
         reply_markup=markup,
     )
     bot.register_next_step_handler(msg, process_initial_amount, user_data, bot)

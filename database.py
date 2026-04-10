@@ -93,7 +93,7 @@ def create_trip(telegram_id, departure_country, destination_country,
                 initial_amount, convert_currency_func):
     """
     Создание нового путешествия
-    
+
     Args:
         telegram_id: ID пользователя в Telegram
         departure_country: Страна отправления
@@ -103,7 +103,7 @@ def create_trip(telegram_id, departure_country, destination_country,
         exchange_rate: Курс обмена
         initial_amount: Начальная сумма
         convert_currency_func: Функция для конвертации валюты
-    
+
     Returns:
         tuple: (success: bool, message: str)
     """
