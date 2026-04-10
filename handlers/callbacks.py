@@ -1,31 +1,32 @@
 """Обработчики callback-запросов (inline кнопки)"""
 
-from config import COUNTRY_CURRENCIES
-from database import (
-    get_active_trip, 
-    get_user_trips, 
-    switch_active_trip, 
-    update_trip_balance,
-    update_exchange_rate,
-    add_expense,
-    get_expenses_history,
-    create_trip
-)
-from keyboards import trip_list_buttons, back_button, expense_description_buttons, main_menu
-from api_client import convert_currency
-from handlers.commands import process_departure_country_wrapper
 import re
+
+from api_client import convert_currency
+from database import (
+    add_expense,
+    create_trip,
+    get_active_trip,
+    get_expenses_history,
+    get_user_trips,
+    switch_active_trip,
+    update_exchange_rate,
+    update_trip_balance,
+)
+from keyboards import back_button, expense_description_buttons, main_menu, trip_list_buttons
+from utils.currency_utils import format_currency_display
 
 
 def register_callbacks(bot):
     """Регистрация обработчиков callback"""
-    
+
     @bot.callback_query_handler(func=lambda call: True)
     def handle_callback(call):
         if call.data == "new_trip":
-            # Импортируем функцию после регистрации команд
+            from handlers.commands import process_departure_country
+
             msg = bot.reply_to(call.message, "Введите страну отправления:")
-            bot.register_next_step_handler(msg, lambda m: process_departure_country_wrapper(m, bot))
+            bot.register_next_step_handler(msg, process_departure_country)
         elif call.data == "my_trips":
             show_my_trips(call, bot)
         elif call.data == "balance":
@@ -50,10 +51,10 @@ def register_callbacks(bot):
             handle_expense_cancel(call, bot)
         elif call.data == "back_to_menu":
             bot.edit_message_text(
-                chat_id=call.message.chat.id, 
+                chat_id=call.message.chat.id,
                 message_id=call.message.message_id,
-                text="Выберите действие:", 
-                reply_markup=main_menu()
+                text="Выберите действие:",
+                reply_markup=main_menu(),
             )
 
 
@@ -66,24 +67,13 @@ def show_my_trips(call, bot):
         return
 
     trips_text = "🧳 Ваши путешествия:\n\n"
-    
+
     for i, trip in enumerate(trips, 1):
         is_active = trip[9] == 1
         status = "🟢 АКТИВНО" if is_active else "⚪ Неактивно"
 
-        dep_curr_code = trip[4]
-        dest_curr_code = trip[5]
-
-        dep_curr_name = dep_curr_code
-        dest_curr_name = dest_curr_code
-        for country, (code, name) in COUNTRY_CURRENCIES.items():
-            if code == dep_curr_code:
-                dep_curr_name = f"{code} ({name})"
-                break
-        for country, (code, name) in COUNTRY_CURRENCIES.items():
-            if code == dest_curr_code:
-                dest_curr_name = f"{code} ({name})"
-                break
+        dep_curr_name = format_currency_display(trip[4], trip)
+        dest_curr_name = format_currency_display(trip[5], trip)
 
         trips_text += f"{i}. {trip[2]} → {trip[3]} ({dep_curr_name} → {dest_curr_name})\n"
         trips_text += f"   {status}\n"
@@ -101,19 +91,8 @@ def show_balance(call, bot):
         bot.reply_to(call.message, "❌ У вас нет активного путешествия. Создайте его с помощью /newtrip")
         return
 
-    dep_curr_code = trip[4]
-    dest_curr_code = trip[5]
-
-    dep_curr_name = dep_curr_code
-    dest_curr_name = dest_curr_code
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dep_curr_code:
-            dep_curr_name = f"{code} ({name})"
-            break
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dest_curr_code:
-            dest_curr_name = f"{code} ({name})"
-            break
+    dep_curr_name = format_currency_display(trip[4], trip)
+    dest_curr_name = format_currency_display(trip[5], trip)
 
     bot.reply_to(call.message, f"💰 Баланс:\n{trip[7]:,.2f} {dep_curr_name} = {trip[8]:,.2f} {dest_curr_name}")
 
@@ -132,19 +111,8 @@ def show_history(call, bot):
         bot.reply_to(call.message, "📋 История расходов пуста.")
         return
 
-    dep_curr_code = trip[4]
-    dest_curr_code = trip[5]
-
-    dep_curr_name = dep_curr_code
-    dest_curr_name = dest_curr_code
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dep_curr_code:
-            dep_curr_name = f"{code} ({name})"
-            break
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dest_curr_code:
-            dest_curr_name = f"{code} ({name})"
-            break
+    dep_curr_name = format_currency_display(trip[4], trip)
+    dest_curr_name = format_currency_display(trip[5], trip)
 
     history_text = "📋 История расходов:\n\n"
     for expense in expenses[:10]:
@@ -161,32 +129,22 @@ def set_rate_cmd(call, bot):
         bot.reply_to(call.message, "❌ У вас нет активного путешествия.")
         return
 
-    dep_curr_code = trip[4]
-    dest_curr_code = trip[5]
-
-    dep_curr_name = dep_curr_code
-    dest_curr_name = dest_curr_code
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dep_curr_code:
-            dep_curr_name = f"{code} ({name})"
-            break
-    for country, (code, name) in COUNTRY_CURRENCIES.items():
-        if code == dest_curr_code:
-            dest_curr_name = f"{code} ({name})"
-            break
+    dep_curr_name = format_currency_display(trip[4], trip)
+    dest_curr_name = format_currency_display(trip[5], trip)
 
     markup = back_button()
-    msg = bot.reply_to(call.message, f"💱 Введите курс валюты страны пребывания:\n\n1 {dest_curr_name} = ? {dep_curr_name}", reply_markup=markup)
+    msg = bot.reply_to(
+        call.message,
+        f"💱 Введите курс валюты страны пребывания:\n\n1 {dest_curr_name} = ? {dep_curr_name}",
+        reply_markup=markup,
+    )
     bot.register_next_step_handler(msg, update_exchange_rate_handler, bot)
 
 
 def update_exchange_rate_handler(message, bot):
     """Обработчик обновления курса обмена"""
     try:
-        # Заменяем запятую на точку для правильной обработки
         rate_text = message.text.strip().replace(',', '.')
-        # Пользователь вводит: 1 GEL = 3.5 RUB
-        # Это курс "валюта назначения → валюта отправления"
         direct_rate = float(re.sub(r'[^\d.-]', '', rate_text))
 
         active_trip = get_active_trip(message.from_user.id)
@@ -194,38 +152,25 @@ def update_exchange_rate_handler(message, bot):
             bot.reply_to(message, "❌ У вас нет активного путешествия.")
             return
 
-        dep_curr_code = active_trip[4]
-        dest_curr_code = active_trip[5]
+        dep_curr_name = format_currency_display(active_trip[4], active_trip)
+        dest_curr_name = format_currency_display(active_trip[5], active_trip)
 
-        dep_curr_name = dep_curr_code
-        dest_curr_name = dest_curr_code
-        for country, (code, name) in COUNTRY_CURRENCIES.items():
-            if code == dep_curr_code:
-                dep_curr_name = f"{code} ({name})"
-                break
-        for country, (code, name) in COUNTRY_CURRENCIES.items():
-            if code == dest_curr_code:
-                dest_curr_name = f"{code} ({name})"
-                break
-
-        # Конвертируем в обратный курс для хранения в БД
-        # Если 1 GEL = 3.5 RUB, то 1 RUB = 1/3.5 = 0.286 GEL
         inverse_rate = 1 / direct_rate
-        
-        # Обновляем курс в БД (храним обратный курс)
         new_destination_balance = update_exchange_rate(active_trip[0], inverse_rate, active_trip[7])
 
-        # Форматируем числа для красивого вывода
         dep_balance_formatted = f"{active_trip[7]:,.2f}"
         dest_balance_formatted = f"{new_destination_balance:,.2f}"
         direct_rate_formatted = f"{direct_rate:.2f}"
         inverse_rate_formatted = f"{inverse_rate:.4f}"
 
-        bot.reply_to(message, f"✅ Курс обмена обновлён:\n"
-                             f"1 {dest_curr_name} = {direct_rate_formatted} {dep_curr_name}\n"
-                             f"(1 {dep_curr_name} = {inverse_rate_formatted} {dest_curr_name})\n\n"
-                             f"Новый баланс:\n"
-                             f"{dep_balance_formatted} {dep_curr_name} = {dest_balance_formatted} {dest_curr_name}")
+        bot.reply_to(
+            message,
+            f"✅ Курс обмена обновлён:\n"
+            f"1 {dest_curr_name} = {direct_rate_formatted} {dep_curr_name}\n"
+            f"(1 {dep_curr_name} = {inverse_rate_formatted} {dest_curr_name})\n\n"
+            f"Новый баланс:\n"
+            f"{dep_balance_formatted} {dep_curr_name} = {dest_balance_formatted} {dest_curr_name}",
+        )
     except ValueError:
         bot.reply_to(message, "❌ Пожалуйста, введите корректное число для курса обмена.")
     except ZeroDivisionError:
@@ -285,14 +230,12 @@ def handle_expense_skip(call, bot):
 def handle_expense_cancel(call, bot):
     """Отмена ввода расхода"""
     bot.edit_message_text(
-        chat_id=call.message.chat.id, 
+        chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text=call.message.text.split('\n')[0] + "\n\n❌ Ввод расхода отменён."
+        text=call.message.text.split('\n')[0] + "\n\n❌ Ввод расхода отменён.",
     )
-    # Очищаем временные данные
     bot.temp_data = getattr(bot, 'temp_data', {})
     bot.temp_data.pop(call.from_user.id, None)
-    # Отменяем следующий шаг обработчик для этого пользователя
     bot.clear_step_handler(call.message)
 
 
